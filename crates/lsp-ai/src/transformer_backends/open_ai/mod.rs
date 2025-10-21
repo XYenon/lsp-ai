@@ -141,7 +141,9 @@ impl OpenAI {
             "echo": false,
             "prompt": prompt
         });
-        // Merge additional parameters from params
+        // Merge model-level parameters first (lower priority)
+        crate::utils::merge_json(&mut request_params, &serde_json::to_value(&self.configuration.parameters)?);
+        // Then merge completion/chat parameters (higher priority, overrides model-level)
         crate::utils::merge_json(&mut request_params, &params);
         info!(
             "Calling OpenAI compatible completions API with parameters:\n{}",
@@ -206,7 +208,9 @@ impl OpenAI {
             "temperature": parsed_params.temperature,
             "messages": messages
         });
-        // Merge additional parameters from params
+        // Merge model-level parameters first (lower priority)
+        crate::utils::merge_json(&mut request_params, &serde_json::to_value(&self.configuration.parameters)?);
+        // Then merge completion/chat parameters (higher priority, overrides model-level)
         crate::utils::merge_json(&mut request_params, &params);
         info!(
             "Calling OpenAI compatible chat API with parameters:\n{}",

@@ -300,6 +300,9 @@ pub(crate) struct OpenAI {
     // Custom HTTP headers
     #[serde(default)]
     pub(crate) headers: HashMap<String, String>,
+    // Body parameters (lower priority than completion/chat parameters)
+    #[serde(default)]
+    pub(crate) parameters: Kwargs,
 }
 
 #[derive(Clone, Debug, Deserialize)]
