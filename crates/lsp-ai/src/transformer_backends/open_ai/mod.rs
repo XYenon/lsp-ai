@@ -139,12 +139,13 @@ impl OpenAI {
             "frequency_penalty": parsed_params.frequency_penalty,
             "temperature": parsed_params.temperature,
             "echo": false,
-            "prompt": prompt
         });
         // Merge model-level parameters first (lower priority)
         crate::utils::merge_json(&mut request_params, &serde_json::to_value(&self.configuration.parameters)?);
         // Then merge completion/chat parameters (higher priority, overrides model-level)
         crate::utils::merge_json(&mut request_params, &params);
+        // Set prompt last to ensure formatted prompt is used
+        request_params["prompt"] = serde_json::to_value(prompt)?;
         info!(
             "Calling OpenAI compatible completions API with parameters:\n{}",
             serde_json::to_string_pretty(&request_params).unwrap()
@@ -206,12 +207,13 @@ impl OpenAI {
             "presence_penalty": parsed_params.presence_penalty,
             "frequency_penalty": parsed_params.frequency_penalty,
             "temperature": parsed_params.temperature,
-            "messages": messages
         });
         // Merge model-level parameters first (lower priority)
         crate::utils::merge_json(&mut request_params, &serde_json::to_value(&self.configuration.parameters)?);
         // Then merge completion/chat parameters (higher priority, overrides model-level)
         crate::utils::merge_json(&mut request_params, &params);
+        // Set messages last to ensure formatted messages (with placeholders replaced) are used
+        request_params["messages"] = serde_json::to_value(messages)?;
         info!(
             "Calling OpenAI compatible chat API with parameters:\n{}",
             serde_json::to_string_pretty(&request_params).unwrap()
