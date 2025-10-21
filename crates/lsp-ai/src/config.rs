@@ -297,6 +297,9 @@ pub(crate) struct OpenAI {
     pub(crate) max_requests_per_second: f32,
     // The model name
     pub(crate) model: String,
+    // Custom HTTP headers
+    #[serde(default)]
+    pub(crate) headers: HashMap<String, String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]

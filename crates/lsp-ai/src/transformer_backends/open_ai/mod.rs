@@ -125,26 +125,29 @@ impl OpenAI {
     async fn get_completion(
         &self,
         prompt: &str,
-        params: OpenAIRunParams,
+        params: Value,
     ) -> anyhow::Result<String> {
         let client = reqwest::Client::new();
         let token = self.get_token()?;
-        let params = json!({
+        let parsed_params: OpenAIRunParams = serde_json::from_value(params.clone())?;
+        let mut request_params = json!({
             "model": self.configuration.model,
-            "max_tokens": params.max_tokens,
+            "max_tokens": parsed_params.max_tokens,
             "n": 1,
-            "top_p": params.top_p,
-            "presence_penalty": params.presence_penalty,
-            "frequency_penalty": params.frequency_penalty,
-            "temperature": params.temperature,
+            "top_p": parsed_params.top_p,
+            "presence_penalty": parsed_params.presence_penalty,
+            "frequency_penalty": parsed_params.frequency_penalty,
+            "temperature": parsed_params.temperature,
             "echo": false,
             "prompt": prompt
         });
+        // Merge additional parameters from params
+        crate::utils::merge_json(&mut request_params, &params);
         info!(
             "Calling OpenAI compatible completions API with parameters:\n{}",
-            serde_json::to_string_pretty(&params).unwrap()
+            serde_json::to_string_pretty(&request_params).unwrap()
         );
-        let res: OpenAICompletionsResponse = client
+        let mut request_builder = client
             .post(
                 self.configuration
                     .completions_endpoint
@@ -153,8 +156,13 @@ impl OpenAI {
             )
             .bearer_auth(token)
             .header("Content-Type", "application/json")
-            .header("Accept", "application/json")
-            .json(&params)
+            .header("Accept", "application/json");
+        // Add custom headers if configured
+        for (key, value) in &self.configuration.headers {
+            request_builder = request_builder.header(key, value);
+        }
+        let res: OpenAICompletionsResponse = request_builder
+            .json(&request_params)
             .send().await?
             .json().await?;
         info!(
@@ -183,25 +191,28 @@ impl OpenAI {
     async fn get_chat(
         &self,
         messages: Vec<ChatMessage>,
-        params: OpenAIRunParams,
+        params: Value,
     ) -> anyhow::Result<String> {
         let client = reqwest::Client::new();
         let token = self.get_token()?;
-        let params = json!({
+        let parsed_params: OpenAIRunParams = serde_json::from_value(params.clone())?;
+        let mut request_params = json!({
             "model": self.configuration.model,
-            "max_tokens": params.max_tokens,
+            "max_tokens": parsed_params.max_tokens,
             "n": 1,
-            "top_p": params.top_p,
-            "presence_penalty": params.presence_penalty,
-            "frequency_penalty": params.frequency_penalty,
-            "temperature": params.temperature,
+            "top_p": parsed_params.top_p,
+            "presence_penalty": parsed_params.presence_penalty,
+            "frequency_penalty": parsed_params.frequency_penalty,
+            "temperature": parsed_params.temperature,
             "messages": messages
         });
+        // Merge additional parameters from params
+        crate::utils::merge_json(&mut request_params, &params);
         info!(
             "Calling OpenAI compatible chat API with parameters:\n{}",
-            serde_json::to_string_pretty(&params).unwrap()
+            serde_json::to_string_pretty(&request_params).unwrap()
         );
-        let res: OpenAIChatResponse = client
+        let mut request_builder = client
             .post(
                 self.configuration
                     .chat_endpoint
@@ -210,8 +221,13 @@ impl OpenAI {
             )
             .bearer_auth(token)
             .header("Content-Type", "application/json")
-            .header("Accept", "application/json")
-            .json(&params)
+            .header("Accept", "application/json");
+        // Add custom headers if configured
+        for (key, value) in &self.configuration.headers {
+            request_builder = request_builder.header(key, value);
+        }
+        let res: OpenAIChatResponse = request_builder
+            .json(&request_params)
             .send()
             .await?
             .json()
@@ -239,10 +255,11 @@ impl OpenAI {
     async fn do_chat_completion(
         &self,
         prompt: &Prompt,
-        params: OpenAIRunParams,
+        params: Value,
     ) -> anyhow::Result<String> {
+        let parsed_params: OpenAIRunParams = serde_json::from_value(params.clone())?;
         match prompt {
-            Prompt::ContextAndCode(code_and_context) => match &params.messages {
+            Prompt::ContextAndCode(code_and_context) => match &parsed_params.messages {
                 Some(completion_messages) => {
                     let messages = format_chat_messages(completion_messages, code_and_context);
                     self.get_chat(messages, params).await
@@ -252,7 +269,7 @@ impl OpenAI {
                         .await
                 }
             },
-            Prompt::FIM(fim) => match &params.fim {
+            Prompt::FIM(fim) => match &parsed_params.fim {
                 Some(fim_params) => {
                     self.get_completion(
                         &format!(
@@ -282,7 +299,6 @@ impl TransformerBackend for OpenAI {
 
         params: Value,
     ) -> anyhow::Result<DoGenerationResponse> {
-        let params: OpenAIRunParams = serde_json::from_value(params)?;
         let generated_text = self.do_chat_completion(prompt, params).await?;
         Ok(DoGenerationResponse { generated_text })
     }
